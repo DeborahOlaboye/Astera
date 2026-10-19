@@ -293,7 +293,7 @@ pub trait PoolContract {
 #[contractclient(name = "InvoiceClient")]
 pub trait InvoiceContract {
     fn set_grace_period_via_governance(env: Env, governance: Address, days: u32);
-    fn set_max_invoice_amount_via_governance(env: Env, governance: Address, max_amount: i128);
+    fn set_max_invoice_amount_gov(env: Env, governance: Address, max_amount: i128);
     fn set_max_sme_outstanding_via_governance(env: Env, governance: Address, max: i128);
     fn set_expiration_duration_via_governance(
         env: Env,
@@ -911,7 +911,7 @@ impl Governance {
                 }
                 InvoiceAction::SetInvoiceMaxAmount(max_amount) => {
                     InvoiceClient::new(env, target_contract)
-                        .set_max_invoice_amount_via_governance(&this_contract, max_amount);
+                        .set_max_invoice_amount_gov(&this_contract, max_amount);
                 }
                 InvoiceAction::SetInvoiceMaxSmeOutstanding(max) => {
                     InvoiceClient::new(env, target_contract)

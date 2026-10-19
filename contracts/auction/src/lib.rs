@@ -590,7 +590,7 @@ impl AuctionContract {
             .set(&DataKey::Sale(sale_id), &sale);
 
         env.events()
-            .publish((EVT, symbol_short!("sale_cancel")), (sale_id, seller));
+            .publish((EVT, symbol_short!("sale_cncl")), (sale_id, seller));
         Ok(())
     }
 
