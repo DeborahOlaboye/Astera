@@ -1157,7 +1157,7 @@ impl ComplianceContract {
         }
         if list.len() >= max {
             // Drop oldest entry to make room.
-            let evicted = list.get(0).cloned();
+            let evicted = list.get(0);
             let mut trimmed = Vec::new(env);
             for i in 1..list.len() {
                 if let Some(a) = list.get(i) {
@@ -1168,8 +1168,8 @@ impl ComplianceContract {
             // Emit event for the evicted address
             if let Some(evicted_addr) = evicted {
                 let event_key = match key {
-                    DataKey::FlaggedIds => symbol_short!("flag_evict"),
-                    DataKey::PendingReviewIds => symbol_short!("pend_evict"),
+                    DataKey::FlaggedIds => symbol_short!("flag_evct"),
+                    DataKey::PendingReviewIds => symbol_short!("pend_evct"),
                     _ => return,
                 };
                 env.events().publish((EVT, event_key), evicted_addr);

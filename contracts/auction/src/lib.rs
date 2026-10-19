@@ -240,11 +240,12 @@ pub enum AuctionError {
     AuctionNotFound = 28,
     AuctionNotOpen = 29,
     AuctionExpired = 30,
-    AuctionAlreadySettled = 31,
-    BidAmountTooLow = 32,
-    BidEscrowFailed = 33,
-    BidWithdrawFailed = 34,
-    UnauthorizedSettlement = 35,
+    AuctionNotExpired = 31,
+    AuctionAlreadySettled = 32,
+    BidAmountTooLow = 33,
+    BidEscrowFailed = 34,
+    BidWithdrawFailed = 35,
+    UnauthorizedSettlement = 36,
 }
 
 // ── Clearing Algorithm (pure function) ────────────────────────────────────────
@@ -701,7 +702,7 @@ impl AuctionContract {
         discount_bps: u32,
     ) -> Result<(), AuctionError> {
         investor.require_auth();
-        let mut auction: InvoiceAuction = env
+        let auction: InvoiceAuction = env
             .storage()
             .persistent()
             .get(&DataKey::Auction(auction_id))
@@ -831,7 +832,7 @@ impl AuctionContract {
                 .persistent()
                 .set(&DataKey::Auction(auction_id), &auction);
             env.events()
-                .publish((EVT, symbol_short!("inv_cancel")), auction_id);
+                .publish((EVT, symbol_short!("inv_cncl")), auction_id);
             return Err(AuctionError::NoBids);
         }
 
@@ -855,7 +856,7 @@ impl AuctionContract {
             .set(&DataKey::Auction(auction_id), &auction);
 
         env.events()
-            .publish((EVT, symbol_short!("inv_settle")), (auction_id, winning_bid.investor.clone(), winning_bid.discount_bps));
+            .publish((EVT, symbol_short!("inv_stl")), (auction_id, winning_bid.investor.clone(), winning_bid.discount_bps));
         Ok(winning_bid.investor.clone())
     }
 
