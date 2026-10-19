@@ -362,11 +362,13 @@ impl ShareToken {
             .expect("total supply underflow");
         write_total_supply(&env, new_total);
         let allowance_key = DataKey::Allowance(from.clone(), spender.clone());
-        env.storage().persistent().set(
-            &allowance_key,
-            &(allowed - amount),
-        );
-        env.storage().persistent().extend_ttl(&allowance_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        let new_allowance = allowed - amount;
+        if new_allowance == 0 {
+            env.storage().persistent().remove(&allowance_key);
+        } else {
+            env.storage().persistent().set(&allowance_key, &new_allowance);
+            env.storage().persistent().extend_ttl(&allowance_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        }
         env.events()
             .publish((EVT, symbol_short!("burn_from")), (spender, from, amount, new_total));
     }
@@ -499,15 +501,19 @@ impl ShareToken {
         }
         let new_amount = record.amount - subtracted_amount;
         let allowance_key = DataKey::Allowance(owner.clone(), spender.clone());
-        let new_record = AllowanceRecord {
-            amount: new_amount,
-            expiration_ledger: record.expiration_ledger,
-        };
-        env.storage().persistent().set(
-            &allowance_key,
-            &new_record,
-        );
-        env.storage().persistent().extend_ttl(&allowance_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        if new_amount == 0 {
+            env.storage().persistent().remove(&allowance_key);
+        } else {
+            let new_record = AllowanceRecord {
+                amount: new_amount,
+                expiration_ledger: record.expiration_ledger,
+            };
+            env.storage().persistent().set(
+                &allowance_key,
+                &new_record,
+            );
+            env.storage().persistent().extend_ttl(&allowance_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        }
         env.events().publish(
             (EVT, symbol_short!("decrallow")),
             (owner, spender, new_amount),
@@ -556,11 +562,13 @@ impl ShareToken {
         env.storage().persistent().extend_ttl(&balance_to_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
         write_checkpoint(&env, &to, new_balance_to);
         let allowance_key = DataKey::Allowance(from.clone(), spender.clone());
-        env.storage().persistent().set(
-            &allowance_key,
-            &(allowed - amount),
-        );
-        env.storage().persistent().extend_ttl(&allowance_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        let new_allowance = allowed - amount;
+        if new_allowance == 0 {
+            env.storage().persistent().remove(&allowance_key);
+        } else {
+            env.storage().persistent().set(&allowance_key, &new_allowance);
+            env.storage().persistent().extend_ttl(&allowance_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        }
         bump_total_supply_ttl(&env);
         env.events().publish(
             (EVT, symbol_short!("xfer_from")),
