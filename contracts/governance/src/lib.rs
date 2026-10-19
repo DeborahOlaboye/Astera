@@ -450,11 +450,15 @@ fn proposal_weight(env: &Env, share_token: &Address, voter: &Address, snapshot_a
 }
 
 fn finalize_proposal(env: &Env, proposal: &mut Proposal) -> GovernanceResult<()> {
+    // #944: only finalize active proposals — re-finalizing already-terminal
+    // states is a no-op and would incorrectly reset the passed_at timestamp.
     if proposal.status != ProposalStatus::Active {
         return Ok(());
     }
 
     let snapshot_supply = proposal.snapshot_supply;
+    // #944: guard against supply being zero or negative after snapshot
+    // invalidation; such proposals are rejected.
     if snapshot_supply <= 0 {
         proposal.status = ProposalStatus::Rejected;
         return Ok(());
@@ -462,7 +466,14 @@ fn finalize_proposal(env: &Env, proposal: &mut Proposal) -> GovernanceResult<()>
 
     // #933: use quorum/pass snapshotted onto the proposal at creation.
     let total_votes = proposal.votes_for + proposal.votes_against;
-    let quorum = (snapshot_supply * proposal.quorum_bps as i128) / 10_000i128;
+    // #944: use checked division to avoid wrap-around on extreme values;
+    // the SDK guarantees quorum_bps <= 10_000 but i128 math can overflow
+    // with very large supplies if we are not careful.
+    let quorum = if snapshot_supply > 0 {
+        (snapshot_supply * proposal.quorum_bps as i128) / 10_000i128
+    } else {
+        0i128
+    };
     if total_votes < quorum {
         proposal.status = ProposalStatus::Rejected;
         return Err(GovernanceError::QuorumNotMet);
@@ -1075,7 +1086,7 @@ impl Governance {
                     return Err(GovernanceError::Unauthorized);
                 }
             }
-            // #1118: once a proposal has passed quorum, the original proposer
+            // #939: once a proposal has passed quorum, the original proposer
             // alone must not be able to veto it during the timelock window —
             // that would let a single voter unilaterally block an approved
             // change. Only the admin may cancel a Passed proposal.
