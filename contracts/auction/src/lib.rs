@@ -504,17 +504,17 @@ impl AuctionContract {
         }
         let price = Self::price_at(&sale, now)?;
 
-        let proceeds_client = token::Client::new(&env, &sale.proceeds_token);
-        proceeds_client.transfer(&taker, &sale.proceeds_recipient, &price);
-        let token_client = token::Client::new(&env, &sale.token);
-        token_client.transfer(&env.current_contract_address(), &taker, &sale.amount);
-
         sale.status = SaleStatus::Settled;
         sale.taker = Some(taker.clone());
         sale.settled_price = Some(price);
         env.storage()
             .persistent()
             .set(&DataKey::Sale(sale_id), &sale);
+
+        let proceeds_client = token::Client::new(&env, &sale.proceeds_token);
+        proceeds_client.transfer(&taker, &sale.proceeds_recipient, &price);
+        let token_client = token::Client::new(&env, &sale.token);
+        token_client.transfer(&env.current_contract_address(), &taker, &sale.amount);
 
         env.events()
             .publish((EVT, symbol_short!("sale_take")), (sale_id, taker, price));
@@ -546,13 +546,13 @@ impl AuctionContract {
             return Err(AuctionError::SaleNotExpired);
         }
 
-        let token_client = token::Client::new(&env, &sale.token);
-        token_client.transfer(&env.current_contract_address(), &sale.seller, &sale.amount);
-
         sale.status = SaleStatus::Expired;
         env.storage()
             .persistent()
             .set(&DataKey::Sale(sale_id), &sale);
+
+        let token_client = token::Client::new(&env, &sale.token);
+        token_client.transfer(&env.current_contract_address(), &sale.seller, &sale.amount);
 
         env.events()
             .publish((EVT, symbol_short!("sale_exp")), (sale_id, caller));
@@ -581,13 +581,13 @@ impl AuctionContract {
             return Err(AuctionError::Unauthorized);
         }
 
-        let token_client = token::Client::new(&env, &sale.token);
-        token_client.transfer(&env.current_contract_address(), &sale.seller, &sale.amount);
-
         sale.status = SaleStatus::Cancelled;
         env.storage()
             .persistent()
             .set(&DataKey::Sale(sale_id), &sale);
+
+        let token_client = token::Client::new(&env, &sale.token);
+        token_client.transfer(&env.current_contract_address(), &sale.seller, &sale.amount);
 
         env.events()
             .publish((EVT, symbol_short!("sale_cncl")), (sale_id, seller));
@@ -607,6 +607,24 @@ impl AuctionContract {
 
     pub fn get_pool_contract(env: Env) -> Option<Address> {
         env.storage().instance().get(&DataKey::PoolContract)
+    }
+
+    pub fn set_admin(env: Env, admin: Address, new_admin: Address) -> Result<(), AuctionError> {
+        admin.require_auth();
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(AuctionError::NotInitialized)?;
+        if admin != stored_admin {
+            return Err(AuctionError::Unauthorized);
+        }
+        env.storage().instance().set(&DataKey::Admin, &new_admin);
+        env.events().publish(
+            (EVT, symbol_short!("admin_set")),
+            (admin, new_admin),
+        );
+        Ok(())
     }
 
     fn require_pool(env: &Env) -> Result<Address, AuctionError> {
