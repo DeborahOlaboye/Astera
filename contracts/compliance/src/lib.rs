@@ -602,6 +602,10 @@ impl ComplianceContract {
         caller.require_auth();
         require_not_paused(&env);
 
+        if reason.is_empty() || reason.len() > 1024 {
+            return Err(ComplianceError::InvalidReason);
+        }
+
         let now = env.ledger().timestamp();
 
         // #927: enforce cooldown — same caller cannot re-request review for the
