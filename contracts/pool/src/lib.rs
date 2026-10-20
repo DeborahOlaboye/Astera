@@ -4330,6 +4330,8 @@ impl FundingPool {
         env.storage()
             .instance()
             .set(&DataKey::FeeTier(tier_id), &tier);
+        env.events()
+            .publish((EVT, symbol_short!("set_fee")), (admin, tier_id, tier));
         Ok(())
     }
 
@@ -4359,6 +4361,8 @@ impl FundingPool {
         }
         env.storage().instance().set(&DataKey::FeeTierIds, &new_ids);
         env.storage().instance().remove(&DataKey::FeeTier(tier_id));
+        env.events()
+            .publish((EVT, symbol_short!("rm_fee")), (admin, tier_id));
         Ok(())
     }
 
@@ -8559,6 +8563,50 @@ mod test {
 
         client.remove_fee_tier(&admin, &1u32);
         assert!(client.get_fee_tier(&1u32).is_none());
+    }
+
+    #[test]
+    fn test_fee_tier_set_and_remove_emit_events() {
+        // #1511: fee-tier admin mutations must be observable off-chain.
+        use soroban_sdk::testutils::Events;
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, admin, _usdc_id, _share_token) = setup(&env);
+
+        let tier = FeeTier {
+            min_amount: 0,
+            max_amount: 100_000,
+            min_credit_score: 500,
+            fee_bps: 150,
+        };
+        client.set_fee_tier(&admin, &1u32, &tier);
+
+        let expected_set: soroban_sdk::Vec<soroban_sdk::Val> =
+            (EVT, symbol_short!("set_fee")).into_val(&env);
+        let set_event = env
+            .events()
+            .all()
+            .iter()
+            .find(|e| e.1 == expected_set)
+            .expect("set_fee event not emitted");
+        let (event_admin, event_tier_id, event_tier): (Address, u32, FeeTier) =
+            set_event.2.into_val(&env);
+        assert_eq!(event_admin, admin);
+        assert_eq!(event_tier_id, 1u32);
+        assert_eq!(event_tier, tier);
+
+        client.remove_fee_tier(&admin, &1u32);
+        let expected_remove: soroban_sdk::Vec<soroban_sdk::Val> =
+            (EVT, symbol_short!("rm_fee")).into_val(&env);
+        let remove_event = env
+            .events()
+            .all()
+            .iter()
+            .find(|e| e.1 == expected_remove)
+            .expect("rm_fee event not emitted");
+        let (event_admin, event_tier_id): (Address, u32) = remove_event.2.into_val(&env);
+        assert_eq!(event_admin, admin);
+        assert_eq!(event_tier_id, 1u32);
     }
 
     // ---- Issue #61: Edge-Case Tests ----
